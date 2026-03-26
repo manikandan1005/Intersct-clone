@@ -1,10 +1,9 @@
 "use client"
 import useAxios from '@/lib/http/useAxios';
-import { Flex, Checkbox, Table, Button, Input, Center } from '@chakra-ui/react';
+import { Flex, Checkbox, Table, Button, Input } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { MdOutlineAddReaction, MdCancel } from "react-icons/md";
-import React, { useState } from 'react'
-import { boolean } from 'zod';
+import React, { useEffect, useState } from 'react'
 import { useLogin } from '@/lib/loginStore';
 
 
@@ -12,135 +11,82 @@ function page() {
   const actions: string[] = ["SNO", "screenStatus", "view", "edit", "create", "delete",]
   const router = useRouter()
   const [request] = useAxios({ endpoint: "CREATEROLE" })
-  const screenMasterData = useLogin((s) => s.screenmaster);
+  // const screenMasterData = useLogin((s) => s.screenmaster);
   // const screenMasterData = data.screens;
 
-  const mani = screenMasterData.map((screen) => ({
-    screenName: screen.name,
-    create: screen?.permissions.create,
-    edit: screen?.permissions.edit,
-    delete: screen?.permissions.delete,
-    view: screen?.permissions.view,
-    screenStatus: screen.status === true,
-  }));
-  console.log("hiiii")
-  console.log("data-=====", mani)
-  const temp = {
+  const getScreeMaster = useLogin((s) => s.getScreeMaster);
+  const screenmaster = useLogin((s) => s.screenmaster);
+
+  const [role, setRole] = useState<{ name: string; screens: any[] }>({
     name: "",
-    permissions: [
-      {
-        screenName: "Inbox",
-        create: true,
-        edit: true,
-        delete: true,
-        view: true,
-        screenStatus: true
-      },
-      {
-        screenName: "Template",
-        create: false,
-        edit: false,
-        delete: false,
-        view: false,
-        screenStatus: false
-      },
-      {
-        screenName: "AgentSetting",
-        create: false,
-        edit: false,
-        delete: false,
-        view: false,
-        screenStatus: false
-      },
-      {
-        screenName: "Contact",
-        create: false,
-        edit: false,
-        delete: false,
-        view: false,
-        screenStatus: false
-      },
-      {
-        screenName: "Role Mapping",
-        create: false,
-        edit: false,
-        delete: false,
-        view: false,
-        screenStatus: false
+    screens: []
+  });
+
+  useEffect(() => {
+    if (screenmaster.length > 0) {
+      setRole((prev) => ({
+        ...prev,
+        screens: screenmaster.map((screen) => ({
+          id: screen.id,
+          name: screen.name,
+          permissions: {
+            create: false,
+            edit: false,
+            delete: false,
+            view: false,
+          },
+          status: "true"
+        }))
+      }));
+    }
+  }, [screenmaster]);
+
+  function handleChanges(index: number, field: string, value: boolean) {
+    setRole((prevRole) => {
+      const newScreens = [...prevRole.screens];
+      if (newScreens[index]) {
+        newScreens[index] = {
+          ...newScreens[index],
+          permissions: {
+            ...newScreens[index].permissions,
+            [field]: value
+          }
+        };
       }
-    ]
-  }
-  // const updatedTemp: any = {
-  //   ...temp,
-  //   permissions: screenMasterData.map(
-  //     ({ name, status, permissions: { create, edit, delete: del, view } }) => ({
-  //       screenName: name,
-  //       create,
-  //       edit,
-  //       delete: del,
-  //       view,
-  //       screenStatus: status === "true"
-  //     })
-  //   )
-  // };
-
-  // console.log(updatedTemp);
-  const [role, setRole] = useState(temp);
-  function check(data: any) {
-    console.log("check data: ", data)
-    if (data.create || data.delete || data.edit || data.view)
-      return true
-    else return false
+      return { ...prevRole, screens: newScreens };
+    });
   }
 
-  const [payloade, setPayloade] = useState<any>({ name: "", permissions: [] });
-
-function handleChanges(index: number, field: string, value: boolean) {
-  const newData = [...role.permissions];
-  newData[index] = { ...newData[index], [field]: value };
-  newData[index].screenStatus = check(newData[index]);
-
-  setRole({ ...role, permissions: newData });
-
-  const activePermissions = newData.filter(
-    (item) => item.create || item.edit || item.delete || item.view
-  );
-
-  const newPayload = {
-    name: role.name,
-    permissions: activePermissions,
-  };
-
-  setPayloade(newPayload);
-  console.log("payload ======", newPayload);
-}
-  const onSubmit = async (data: any) => {
-    // setCreateContact(false)
-    console.log("Sent successfully", data)
+  const onSubmit = async () => {
+    const payload = {
+      name: role.name,
+      permissions: role.screens
+    };
+    console.log("Sent successfully", payload)
     try {
       const response = await request({
         method: "POST",
-        data: data
+        data: payload
       });
       console.log("Backend response:", response);
-      //   SetContactedAdded(true);
-
-
-
+      router.back();
     } catch (err) {
       alert(err)
       console.error("Error sending data", err)
     }
-    //reset
-    // reset()
   }
-  function sendData() {
-    // alert("hiii")
-    // setRole()
-    onSubmit(role)
-    console.log("send deat ======",payloade)
 
+  function sendData() {
+    onSubmit()
   }
+
+
+  useEffect(() => {
+    const fetchData = async () => {
+      await getScreeMaster();
+    };
+    fetchData();
+  }, []);
   return (
     <div>
       <Flex direction="column" gap="25px" m="15px">
@@ -175,24 +121,19 @@ function handleChanges(index: number, field: string, value: boolean) {
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {mani.map((items, index) => (
+            {screenmaster.map((screen, index) => (
               <Table.Row key={index}>
-                {/* all */}
-                {/* <Table.Cell>{<input type='checkbox'></input>}</Table.Cell> */}
                 <Table.Cell>{index + 1}</Table.Cell>
-                <Table.Cell >{items.screenName}</Table.Cell>
-                {/*  */}
+                <Table.Cell >{screen.name}</Table.Cell>
                 <Table.Cell>
-                  {/* view */}
-                  {items.view ?
+                  {screen.permissions.view ?
                     <Checkbox.Root
                       variant="solid"
                       colorPalette="green"
+                      checked={role.screens[index]?.permissions.view === true}
                       onCheckedChange={(details) => {
-
                         handleChanges(index, "view", details.checked === true)
-                      }
-                      }
+                      }}
                     >
                       <Checkbox.HiddenInput />
                       <Checkbox.Control />
@@ -201,12 +142,11 @@ function handleChanges(index: number, field: string, value: boolean) {
                   }
                 </Table.Cell>
                 <Table.Cell>
-                  {/* edit */}
-                  {items.edit ?
+                  {screen.permissions.edit ?
                     <Checkbox.Root
                       variant="solid"
                       colorPalette="green"
-                      // checked={items.edit}
+                      checked={role.screens[index]?.permissions.edit === true}
                       onCheckedChange={(details) => {
                         handleChanges(index, "edit", details.checked === true)
                       }}
@@ -215,43 +155,39 @@ function handleChanges(index: number, field: string, value: boolean) {
                       <Checkbox.Control />
                     </Checkbox.Root>
                     : "-"
-
                   }
                 </Table.Cell>
-                {/* create */}
-                <Table.Cell>{items.create ?
-                  <Checkbox.Root
-                    variant="solid"
-                    colorPalette="green"
-                    // checked={items.create}
-                    onCheckedChange={(details) => {
-                      handleChanges(index, "create", details.checked === true)
-                    }}
-                  >
-                    <Checkbox.HiddenInput />
-                    <Checkbox.Control />
-                  </Checkbox.Root>
-                  : "-"
-
-                }
+                <Table.Cell>
+                  {screen.permissions.create ?
+                    <Checkbox.Root
+                      variant="solid"
+                      colorPalette="green"
+                      checked={role.screens[index]?.permissions.create === true}
+                      onCheckedChange={(details) => {
+                        handleChanges(index, "create", details.checked === true)
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                    </Checkbox.Root>
+                    : "-"
+                  }
                 </Table.Cell>
-                {/* delete */}
-                <Table.Cell>{items.delete ?
-                  <Checkbox.Root
-                    variant="solid"
-                    colorPalette="green"
-                    // checked={items.delete}
-                    onCheckedChange={(details) => {
-                      handleChanges(index, "delete", details.checked === true)
-                    }}
-                  >
-                    <Checkbox.HiddenInput />
-                    <Checkbox.Control />
-                  </Checkbox.Root>
-                  : "-"
-
-                }</Table.Cell>
-
+                <Table.Cell>
+                  {screen.permissions.delete ?
+                    <Checkbox.Root
+                      variant="solid"
+                      colorPalette="green"
+                      checked={role.screens[index]?.permissions.delete === true}
+                      onCheckedChange={(details) => {
+                        handleChanges(index, "delete", details.checked === true)
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                    </Checkbox.Root>
+                    : "-"
+                  }</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>
@@ -261,7 +197,7 @@ function handleChanges(index: number, field: string, value: boolean) {
           <Button variant="subtle" colorPalette="green" className=' text-white' onClick={() => { sendData() }}><MdOutlineAddReaction />
             Create</Button>
           <Button variant="subtle" colorPalette="red" className=' text-white' onClick={() => {
-            setRole(temp);
+            setRole({ name: "", screens: [] });
             // router.back()
           }}><MdCancel />
             Cancel</Button>
